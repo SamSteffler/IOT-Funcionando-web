@@ -1,11 +1,24 @@
-<script setup></script>
+<script setup>
+import ESP32Interface from './components/ESP32Interface.vue'
+</script>
 
 <template>
-  <h1>You did it!</h1>
-  <p>
-    Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
-    documentation
-  </p>
+  <ESP32Interface />
 </template>
 
-<style scoped></style>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+#app {
+  width: 100%;
+  height: 100vh;
+}
+</style>
