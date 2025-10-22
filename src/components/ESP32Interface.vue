@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
+import ProvisionSetup from './ProvisionSetup.vue'
 
 const selectedPin = ref(null)
 
@@ -29,7 +30,7 @@ const rightPins = ref([
   { number: 20, capabilities: ['ADC', 'PWM'], usable: true, value: 0, notes: 'USB D- (OTG)' },
   { number: 21, capabilities: ['PWM'], usable: true, value: 0, notes: '' },
   { number: 47, capabilities: ['PWM'], usable: true, value: 0, notes: '' },
-  { number: 48, capabilities: ['PWM'], usable: true, value: 0, notes: 'WS2812 builtin' },
+  { number: 48, capabilities: ['PWM', 'built-in'], usable: true, value: 0, notes: 'WS2812 builtin' },
   { number: 45, capabilities: ['PWM'], usable: false, value: 0, notes: 'VSPI - Internal' },
   { number: 0, capabilities: ['PWM'], usable: false, value: 0, notes: 'Boot - Internal' },
   { number: 35, capabilities: ['PWM'], usable: false, value: 0, notes: 'PSRAM - Internal' },
@@ -40,7 +41,7 @@ const rightPins = ref([
   { number: 40, capabilities: ['PWM'], usable: true, value: 0, notes: 'SD_DATA (if SD not used)' },
   { number: 41, capabilities: ['PWM'], usable: true, value: 0, notes: '' },
   { number: 42, capabilities: ['PWM'], usable: true, value: 0, notes: '' },
-  { number: 2, capabilities: ['touch', 'ADC', 'PWM'], usable: true, value: 0, notes: 'LED builtin' },
+  { number: 2, capabilities: ['touch', 'ADC', 'PWM', 'built-in'], usable: true, value: 0, notes: 'LED builtin' },
   { number: 1, capabilities: ['touch', 'ADC', 'PWM'], usable: true, value: 0, notes: '' },
   { number: 'RX', capabilities: ['PWM'], usable: true, value: 0, notes: 'UART RX' },
   { number: 'TX', capabilities: ['PWM'], usable: true, value: 0, notes: 'UART TX' },
@@ -63,11 +64,42 @@ const readValue = () => {
     // Add your read logic here
   }
 }
+
+// Device and connection info
+const devices = ref([
+  { id: 1, name: 'ESP32 #1', connected: true },
+  { id: 2, name: 'ESP32 #2', connected: false },
+])
+
+const selectedDevice = ref(devices.value[0])
+const connectionInfo = ref({
+  ip: '192.168.1.100',
+  mac: 'AA:BB:CC:DD:EE:FF',
+  rssi: -45,
+  firmware: 'v1.0.0'
+})
+
+const mqttInfo = ref({
+  server: 'mqtt.example.com',
+  port: 1883,
+  clientId: 'esp32_device_1',
+  connected: true
+})
+
+const selectDevice = (device) => {
+  selectedDevice.value = device
+  // Load device-specific data here
+}
+
+const showProvision = ref(false)
+const openProvision = () => { showProvision.value = true }
+const closeProvision = () => { showProvision.value = false }
 </script>
 
 <template>
   <div class="esp32-interface">
-    <div class="board-section">
+    <div class="main-content">
+      <div class="board-section">
       <h2>ESP32-S3 Board</h2>
       <div class="board-container">
         <img src="/ESP32S3_Pinout.png" alt="ESP32-S3 Board" class="board-image" />
@@ -81,7 +113,8 @@ const readValue = () => {
             :class="['pin-button', 'left', { 
               active: selectedPin?.number === pin.number,
               unusable: !pin.usable,
-              'i2c-pin': pin.capabilities.includes('I2C')
+              'i2c-pin': pin.capabilities.includes('I2C'),
+              'built-in': pin.capabilities.includes('built-in')
             }]"
           >
             {{ pin.number }}
@@ -96,7 +129,8 @@ const readValue = () => {
             @click="selectPin(pin)"
             :class="['pin-button', 'right', { 
               active: selectedPin?.number === pin.number,
-              unusable: !pin.usable
+              unusable: !pin.usable,
+              'built-in': pin.capabilities.includes('built-in')
             }]"
           >
             {{ pin.number }}
@@ -151,17 +185,77 @@ const readValue = () => {
         <p>👈 Select a pin to view configuration and readings</p>
       </div>
     </div>
+    </div>
+
+    <!-- Bottom Ribbon -->
+    <div class="bottom-ribbon">
+      <div class="ribbon-section device-selector">
+        <label>Device:</label>
+        <select v-model="selectedDevice" @change="selectDevice(selectedDevice)">
+          <option v-for="device in devices" :key="device.id" :value="device">
+            {{ device.name }}
+          </option>
+        </select>
+        <span :class="['connection-dot', { connected: selectedDevice.connected }]"></span>
+      </div>
+
+      <div class="ribbon-section connection-info">
+        <div class="info-item">
+          <span class="info-label">IP:</span>
+          <span class="info-value">{{ connectionInfo.ip }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">MAC:</span>
+          <span class="info-value">{{ connectionInfo.mac }}</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Signal:</span>
+          <span class="info-value">{{ connectionInfo.rssi }} dBm</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">FW:</span>
+          <span class="info-value">{{ connectionInfo.firmware }}</span>
+        </div>
+      </div>
+
+      <div class="ribbon-section mqtt-info">
+        <div class="mqtt-status">
+          <span class="mqtt-label">MQTT:</span>
+          <span :class="['status-indicator', { connected: mqttInfo.connected }]">
+            {{ mqttInfo.connected ? '●' : '○' }}
+          </span>
+          <span class="mqtt-server">{{ mqttInfo.server }}:{{ mqttInfo.port }}</span>
+        </div>
+        <div class="mqtt-client">
+          <span class="client-id">{{ mqttInfo.clientId }}</span>
+        </div>
+      </div>
+
+      <div class="ribbon-section actions">
+        <button class="ribbon-btn" @click="openProvision">⚙️ Settings</button>
+        <button class="ribbon-btn">🔄 Refresh</button>
+      </div>
+    </div>
+    
+    <ProvisionSetup v-if="showProvision" @close="closeProvision" />
   </div>
 </template>
 
 <style scoped>
 .esp32-interface {
   display: flex;
+  flex-direction: column;
   height: 100vh;
-  gap: 20px;
-  padding: 20px;
-  box-sizing: border-box;
   background: #f0f2f5;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  gap: 20px;
+  padding: 20px 20px 0 20px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .board-section {
@@ -227,6 +321,9 @@ const readValue = () => {
 
 .i2c-pin {
     background: #38a169;
+}
+.built-in {
+    background: #ffc53d;
 }
 .pin-button.left {
   transform-origin: right center;
@@ -421,9 +518,169 @@ h3 {
   text-align: center;
 }
 
+/* Bottom Ribbon Styles */
+.bottom-ribbon {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 20px;
+  background: #ffffff;
+  border-top: 2px solid #e2e8f0;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.ribbon-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ribbon-section.device-selector {
+  min-width: 200px;
+}
+
+.ribbon-section.device-selector label {
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 14px;
+}
+
+.ribbon-section.device-selector select {
+  flex: 1;
+  padding: 6px 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #2d3748;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ribbon-section.device-selector select:hover {
+  border-color: #3182ce;
+}
+
+.ribbon-section.device-selector select:focus {
+  outline: none;
+  border-color: #3182ce;
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+}
+
+.connection-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e53e3e;
+  animation: pulse 2s infinite;
+}
+
+.connection-dot.connected {
+  background: #38a169;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.ribbon-section.connection-info {
+  flex: 1;
+  gap: 20px;
+  padding: 0 20px;
+  border-left: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-label {
+  font-size: 12px;
+  color: #718096;
+  font-weight: 600;
+}
+
+.info-value {
+  font-size: 13px;
+  color: #2d3748;
+  font-family: 'Courier New', monospace;
+}
+
+.ribbon-section.mqtt-info {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 250px;
+}
+
+.mqtt-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mqtt-label {
+  font-size: 12px;
+  color: #718096;
+  font-weight: 600;
+}
+
+.status-indicator {
+  font-size: 16px;
+  color: #e53e3e;
+}
+
+.status-indicator.connected {
+  color: #38a169;
+}
+
+.mqtt-server {
+  font-size: 13px;
+  color: #2d3748;
+  font-family: 'Courier New', monospace;
+}
+
+.mqtt-client {
+  font-size: 11px;
+  color: #718096;
+  padding-left: 24px;
+}
+
+.client-id {
+  font-family: 'Courier New', monospace;
+}
+
+.ribbon-section.actions {
+  gap: 8px;
+}
+
+.ribbon-btn {
+  padding: 6px 16px;
+  background: #e2e8f0;
+  border: none;
+  border-radius: 6px;
+  color: #2d3748;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ribbon-btn:hover {
+  background: #cbd5e0;
+}
+
+.ribbon-btn:active {
+  transform: scale(0.95);
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
-  .esp32-interface {
+  .main-content {
     flex-direction: column;
     height: auto;
   }
@@ -440,6 +697,17 @@ h3 {
     transform: none;
     margin-top: 16px;
     max-height: none;
+  }
+
+  .bottom-ribbon {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .ribbon-section.connection-info {
+    border: none;
+    padding: 0;
+    flex-wrap: wrap;
   }
 }
 </style>
